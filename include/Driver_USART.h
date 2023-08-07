@@ -1,0 +1,351 @@
+/*
+ * Copyright (c) 2013-2020 ARM Limited. All rights reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the License); you may
+ * not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * $Date:        31. March 2020
+ * $Revision:    V2.4
+ *
+ * Project:      USART (Universal Synchronous Asynchronous Receiver Transmitter)
+ *               Driver definitions
+ */
+
+/* History:
+ *  Version 2.4
+ *    Removed volatile from wnUSART_STATUS and wnUSART_MODEM_STATUS
+ *  Version 2.3
+ *    wnUSART_STATUS and wnUSART_MODEM_STATUS made volatile
+ *  Version 2.2
+ *    Corrected wnUSART_CPOL_Pos and wnUSART_CPHA_Pos definitions 
+ *  Version 2.1
+ *    Removed optional argument parameter from Signal Event
+ *  Version 2.0
+ *    New simplified driver:
+ *      complexity moved to upper layer (especially data handling)
+ *      more unified API for different communication interfaces
+ *      renamed driver UART -> USART (Asynchronous & Synchronous)
+ *    Added modes:
+ *      Synchronous
+ *      Single-wire
+ *      IrDA
+ *      Smart Card  
+ *    Changed prefix wnDRV -> wnDRIVER
+ *  Version 1.10
+ *    Namespace prefix wn added
+ *  Version 1.01
+ *    Added events:
+ *      wnUART_EVENT_TX_EMPTY,     wnUART_EVENT_RX_TIMEOUT
+ *      wnUART_EVENT_TX_THRESHOLD, wnUART_EVENT_RX_THRESHOLD
+ *    Added functions: SetTxThreshold, SetRxThreshold
+ *    Added "rx_timeout_event" to capabilities
+ *  Version 1.00
+ *    Initial release
+ */
+
+#ifndef DRIVER_USART_H_
+#define DRIVER_USART_H_
+
+#ifdef  __cplusplus
+extern "C"
+{
+#endif
+
+#include "Driver_Common.h"
+#include "wn5gNrPsDataTypes.h"
+
+
+#define wnUSART_API_VERSION wnDRIVER_VERSION_MAJOR_MINOR(2,4)  /* API version */
+
+
+#define _wnDriver_USART_(n)      Driver_USART##n
+#define  wnDriver_USART_(n) _wnDriver_USART_(n)
+
+
+/****** USART Control Codes *****/
+
+#define wnUSART_CONTROL_Pos                0
+#define wnUSART_CONTROL_Msk               (0xFFUL << wnUSART_CONTROL_Pos)
+
+/*----- USART Control Codes: Mode -----*/
+#define wnUSART_MODE_ASYNCHRONOUS         (0x01UL << wnUSART_CONTROL_Pos)   ///< UART (Asynchronous); arg = Baudrate
+#define wnUSART_MODE_SYNCHRONOUS_MASTER   (0x02UL << wnUSART_CONTROL_Pos)   ///< Synchronous Master (generates clock signal); arg = Baudrate
+#define wnUSART_MODE_SYNCHRONOUS_SLAVE    (0x03UL << wnUSART_CONTROL_Pos)   ///< Synchronous Slave (external clock signal)
+#define wnUSART_MODE_SINGLE_WIRE          (0x04UL << wnUSART_CONTROL_Pos)   ///< UART Single-wire (half-duplex); arg = Baudrate
+#define wnUSART_MODE_IRDA                 (0x05UL << wnUSART_CONTROL_Pos)   ///< UART IrDA; arg = Baudrate
+#define wnUSART_MODE_SMART_CARD           (0x06UL << wnUSART_CONTROL_Pos)   ///< UART Smart Card; arg = Baudrate
+
+/*----- USART Control Codes: Mode Parameters: Data Bits -----*/
+#define wnUSART_DATA_BITS_Pos              8
+#define wnUSART_DATA_BITS_Msk             (7UL << wnUSART_DATA_BITS_Pos)
+#define wnUSART_DATA_BITS_5               (5UL << wnUSART_DATA_BITS_Pos)    ///< 5 Data bits
+#define wnUSART_DATA_BITS_6               (6UL << wnUSART_DATA_BITS_Pos)    ///< 6 Data bit
+#define wnUSART_DATA_BITS_7               (7UL << wnUSART_DATA_BITS_Pos)    ///< 7 Data bits
+#define wnUSART_DATA_BITS_8               (0UL << wnUSART_DATA_BITS_Pos)    ///< 8 Data bits (default)
+#define wnUSART_DATA_BITS_9               (1UL << wnUSART_DATA_BITS_Pos)    ///< 9 Data bits
+
+/*----- USART Control Codes: Mode Parameters: Parity -----*/
+#define wnUSART_PARITY_Pos                 12
+#define wnUSART_PARITY_Msk                (3UL << wnUSART_PARITY_Pos)
+#define wnUSART_PARITY_NONE               (0UL << wnUSART_PARITY_Pos)       ///< No Parity (default)
+#define wnUSART_PARITY_EVEN               (1UL << wnUSART_PARITY_Pos)       ///< Even Parity
+#define wnUSART_PARITY_ODD                (2UL << wnUSART_PARITY_Pos)       ///< Odd Parity
+
+/*----- USART Control Codes: Mode Parameters: Stop Bits -----*/
+#define wnUSART_STOP_BITS_Pos              14
+#define wnUSART_STOP_BITS_Msk             (3UL << wnUSART_STOP_BITS_Pos)
+#define wnUSART_STOP_BITS_1               (0UL << wnUSART_STOP_BITS_Pos)    ///< 1 Stop bit (default)
+#define wnUSART_STOP_BITS_2               (1UL << wnUSART_STOP_BITS_Pos)    ///< 2 Stop bits
+#define wnUSART_STOP_BITS_1_5             (2UL << wnUSART_STOP_BITS_Pos)    ///< 1.5 Stop bits
+#define wnUSART_STOP_BITS_0_5             (3UL << wnUSART_STOP_BITS_Pos)    ///< 0.5 Stop bits
+
+/*----- USART Control Codes: Mode Parameters: Flow Control -----*/
+#define wnUSART_FLOW_CONTROL_Pos           16
+#define wnUSART_FLOW_CONTROL_Msk          (3UL << wnUSART_FLOW_CONTROL_Pos)
+#define wnUSART_FLOW_CONTROL_NONE         (0UL << wnUSART_FLOW_CONTROL_Pos) ///< No Flow Control (default)
+#define wnUSART_FLOW_CONTROL_RTS          (1UL << wnUSART_FLOW_CONTROL_Pos) ///< RTS Flow Control
+#define wnUSART_FLOW_CONTROL_CTS          (2UL << wnUSART_FLOW_CONTROL_Pos) ///< CTS Flow Control
+#define wnUSART_FLOW_CONTROL_RTS_CTS      (3UL << wnUSART_FLOW_CONTROL_Pos) ///< RTS/CTS Flow Control
+
+/*----- USART Control Codes: Mode Parameters: Clock Polarity (Synchronous mode) -----*/
+#define wnUSART_CPOL_Pos                   18
+#define wnUSART_CPOL_Msk                  (1UL << wnUSART_CPOL_Pos)
+#define wnUSART_CPOL0                     (0UL << wnUSART_CPOL_Pos)         ///< CPOL = 0 (default)
+#define wnUSART_CPOL1                     (1UL << wnUSART_CPOL_Pos)         ///< CPOL = 1
+
+/*----- USART Control Codes: Mode Parameters: Clock Phase (Synchronous mode) -----*/
+#define wnUSART_CPHA_Pos                   19
+#define wnUSART_CPHA_Msk                  (1UL << wnUSART_CPHA_Pos)
+#define wnUSART_CPHA0                     (0UL << wnUSART_CPHA_Pos)         ///< CPHA = 0 (default)
+#define wnUSART_CPHA1                     (1UL << wnUSART_CPHA_Pos)         ///< CPHA = 1
+
+
+/*----- USART Control Codes: Miscellaneous Controls  -----*/
+#define wnUSART_SET_DEFAULT_TX_VALUE      (0x10UL << wnUSART_CONTROL_Pos)   ///< Set default Transmit value (Synchronous Receive only); arg = value
+#define wnUSART_SET_IRDA_PULSE            (0x11UL << wnUSART_CONTROL_Pos)   ///< Set IrDA Pulse in ns; arg: 0=3/16 of bit period  
+#define wnUSART_SET_SMART_CARD_GUARD_TIME (0x12UL << wnUSART_CONTROL_Pos)   ///< Set Smart Card Guard Time; arg = number of bit periods
+#define wnUSART_SET_SMART_CARD_CLOCK      (0x13UL << wnUSART_CONTROL_Pos)   ///< Set Smart Card Clock in Hz; arg: 0=Clock not generated
+#define wnUSART_CONTROL_SMART_CARD_NACK   (0x14UL << wnUSART_CONTROL_Pos)   ///< Smart Card NACK generation; arg: 0=disabled, 1=enabled
+#define wnUSART_CONTROL_TX                (0x15UL << wnUSART_CONTROL_Pos)   ///< Transmitter; arg: 0=disabled, 1=enabled
+#define wnUSART_CONTROL_RX                (0x16UL << wnUSART_CONTROL_Pos)   ///< Receiver; arg: 0=disabled, 1=enabled
+#define wnUSART_CONTROL_BREAK             (0x17UL << wnUSART_CONTROL_Pos)   ///< Continuous Break transmission; arg: 0=disabled, 1=enabled
+#define wnUSART_ABORT_SEND                (0x18UL << wnUSART_CONTROL_Pos)   ///< Abort \ref wnUSART_Send
+#define wnUSART_ABORT_RECEIVE             (0x19UL << wnUSART_CONTROL_Pos)   ///< Abort \ref wnUSART_Receive
+#define wnUSART_ABORT_TRANSFER            (0x1AUL << wnUSART_CONTROL_Pos)   ///< Abort \ref wnUSART_Transfer
+
+
+
+/****** USART specific error codes *****/
+#define wnUSART_ERROR_MODE                (wnDRIVER_ERROR_SPECIFIC - 1)     ///< Specified Mode not supported
+#define wnUSART_ERROR_BAUDRATE            (wnDRIVER_ERROR_SPECIFIC - 2)     ///< Specified baudrate not supported
+#define wnUSART_ERROR_DATA_BITS           (wnDRIVER_ERROR_SPECIFIC - 3)     ///< Specified number of Data bits not supported
+#define wnUSART_ERROR_PARITY              (wnDRIVER_ERROR_SPECIFIC - 4)     ///< Specified Parity not supported
+#define wnUSART_ERROR_STOP_BITS           (wnDRIVER_ERROR_SPECIFIC - 5)     ///< Specified number of Stop bits not supported
+#define wnUSART_ERROR_FLOW_CONTROL        (wnDRIVER_ERROR_SPECIFIC - 6)     ///< Specified Flow Control not supported
+#define wnUSART_ERROR_CPOL                (wnDRIVER_ERROR_SPECIFIC - 7)     ///< Specified Clock Polarity not supported
+#define wnUSART_ERROR_CPHA                (wnDRIVER_ERROR_SPECIFIC - 8)     ///< Specified Clock Phase not supported
+
+
+/**
+\brief USART Status
+*/
+typedef struct _wnUSART_STATUS {
+  wnUInt32 tx_busy          : 1;        ///< Transmitter busy flag
+  wnUInt32 rx_busy          : 1;        ///< Receiver busy flag
+  wnUInt32 tx_underflow     : 1;        ///< Transmit data underflow detected (cleared on start of next send operation)
+  wnUInt32 rx_overflow      : 1;        ///< Receive data overflow detected (cleared on start of next receive operation)
+  wnUInt32 rx_break         : 1;        ///< Break detected on receive (cleared on start of next receive operation)
+  wnUInt32 rx_framing_error : 1;        ///< Framing error detected on receive (cleared on start of next receive operation)
+  wnUInt32 rx_parity_error  : 1;        ///< Parity error detected on receive (cleared on start of next receive operation)
+  wnUInt32 reserved         : 25;
+} wnUSART_STATUS;
+
+/**
+\brief USART Modem Control
+*/
+typedef enum _wnUSART_MODEM_CONTROL {
+  wnUSART_RTS_CLEAR,                  ///< Deactivate RTS
+  wnUSART_RTS_SET,                    ///< Activate RTS
+  wnUSART_DTR_CLEAR,                  ///< Deactivate DTR
+  wnUSART_DTR_SET                     ///< Activate DTR
+} wnUSART_MODEM_CONTROL;
+
+/**
+\brief USART Modem Status
+*/
+typedef struct _wnUSART_MODEM_STATUS {
+  wnUInt32 cts      : 1;                ///< CTS state: 1=Active, 0=Inactive
+  wnUInt32 dsr      : 1;                ///< DSR state: 1=Active, 0=Inactive
+  wnUInt32 dcd      : 1;                ///< DCD state: 1=Active, 0=Inactive
+  wnUInt32 ri       : 1;                ///< RI  state: 1=Active, 0=Inactive
+  wnUInt32 reserved : 28;
+} wnUSART_MODEM_STATUS;
+
+
+/****** USART Event *****/
+#define wnUSART_EVENT_SEND_COMPLETE       (1UL << 0)  ///< Send completed; however USART may still transmit data
+#define wnUSART_EVENT_RECEIVE_COMPLETE    (1UL << 1)  ///< Receive completed
+#define wnUSART_EVENT_TRANSFER_COMPLETE   (1UL << 2)  ///< Transfer completed
+#define wnUSART_EVENT_TX_COMPLETE         (1UL << 3)  ///< Transmit completed (optional)
+#define wnUSART_EVENT_TX_UNDERFLOW        (1UL << 4)  ///< Transmit data not available (Synchronous Slave)
+#define wnUSART_EVENT_RX_OVERFLOW         (1UL << 5)  ///< Receive data overflow
+#define wnUSART_EVENT_RX_TIMEOUT          (1UL << 6)  ///< Receive character timeout (optional)
+#define wnUSART_EVENT_RX_BREAK            (1UL << 7)  ///< Break detected on receive
+#define wnUSART_EVENT_RX_FRAMING_ERROR    (1UL << 8)  ///< Framing error detected on receive
+#define wnUSART_EVENT_RX_PARITY_ERROR     (1UL << 9)  ///< Parity error detected on receive
+#define wnUSART_EVENT_CTS                 (1UL << 10) ///< CTS state changed (optional)
+#define wnUSART_EVENT_DSR                 (1UL << 11) ///< DSR state changed (optional)
+#define wnUSART_EVENT_DCD                 (1UL << 12) ///< DCD state changed (optional)
+#define wnUSART_EVENT_RI                  (1UL << 13) ///< RI  state changed (optional)
+
+
+// Function documentation
+/**
+  \fn          wnDRIVER_VERSION wnUSART_GetVersion (void)
+  \brief       Get driver version.
+  \return      \ref wnDRIVER_VERSION
+
+  \fn          wnUSART_CAPABILITIES wnUSART_GetCapabilities (void)
+  \brief       Get driver capabilities
+  \return      \ref wnUSART_CAPABILITIES
+
+  \fn          wnInt32 wnUSART_Initialize (wnUSART_SignalEvent_t cb_event)
+  \brief       Initialize USART Interface.
+  \param[in]   cb_event  Pointer to \ref wnUSART_SignalEvent
+  \return      \ref execution_status
+
+  \fn          wnInt32 wnUSART_Uninitialize (void)
+  \brief       De-initialize USART Interface.
+  \return      \ref execution_status
+
+  \fn          wnInt32 wnUSART_PowerControl (wnPOWER_STATE state)
+  \brief       Control USART Interface Power.
+  \param[in]   state  Power state
+  \return      \ref execution_status
+
+  \fn          wnInt32 wnUSART_Send (const void *data, wnUInt32 num)
+  \brief       Start sending data to USART transmitter.
+  \param[in]   data  Pointer to buffer with data to send to USART transmitter
+  \param[in]   num   Number of data items to send
+  \return      \ref execution_status
+
+  \fn          wnInt32 wnUSART_Receive (void *data, wnUInt32 num)
+  \brief       Start receiving data from USART receiver.
+  \param[out]  data  Pointer to buffer for data to receive from USART receiver
+  \param[in]   num   Number of data items to receive
+  \return      \ref execution_status
+
+  \fn          wnInt32 wnUSART_Transfer (const void *data_out,
+                                                 void *data_in,
+                                           wnUInt32    num)
+  \brief       Start sending/receiving data to/from USART transmitter/receiver.
+  \param[in]   data_out  Pointer to buffer with data to send to USART transmitter
+  \param[out]  data_in   Pointer to buffer for data to receive from USART receiver
+  \param[in]   num       Number of data items to transfer
+  \return      \ref execution_status
+
+  \fn          wnUInt32 wnUSART_GetTxCount (void)
+  \brief       Get transmitted data count.
+  \return      number of data items transmitted
+
+  \fn          wnUInt32 wnUSART_GetRxCount (void)
+  \brief       Get received data count.
+  \return      number of data items received
+
+  \fn          wnInt32 wnUSART_Control (wnUInt32 control, wnUInt32 arg)
+  \brief       Control USART Interface.
+  \param[in]   control  Operation
+  \param[in]   arg      Argument of operation (optional)
+  \return      common \ref execution_status and driver specific \ref usart_execution_status
+
+  \fn          wnUSART_STATUS wnUSART_GetStatus (void)
+  \brief       Get USART status.
+  \return      USART status \ref wnUSART_STATUS
+
+  \fn          wnInt32 wnUSART_SetModemControl (wnUSART_MODEM_CONTROL control)
+  \brief       Set USART Modem Control line state.
+  \param[in]   control  \ref wnUSART_MODEM_CONTROL
+  \return      \ref execution_status 
+
+  \fn          wnUSART_MODEM_STATUS wnUSART_GetModemStatus (void)
+  \brief       Get USART Modem Status lines state.
+  \return      modem status \ref wnUSART_MODEM_STATUS
+
+  \fn          void wnUSART_SignalEvent (wnUInt32 event)
+  \brief       Signal USART Events.
+  \param[in]   event  \ref USART_events notification mask
+  \return      none
+*/
+
+typedef void (*wnUSART_SignalEvent_t) (wnUInt32 event);  ///< Pointer to \ref wnUSART_SignalEvent : Signal USART Event.
+
+
+/**
+\brief USART Device Driver Capabilities.
+*/
+typedef struct _wnUSART_CAPABILITIES {
+  wnUInt32 asynchronous       : 1;      ///< supports UART (Asynchronous) mode 
+  wnUInt32 synchronous_master : 1;      ///< supports Synchronous Master mode
+  wnUInt32 synchronous_slave  : 1;      ///< supports Synchronous Slave mode
+  wnUInt32 single_wire        : 1;      ///< supports UART Single-wire mode
+  wnUInt32 irda               : 1;      ///< supports UART IrDA mode
+  wnUInt32 smart_card         : 1;      ///< supports UART Smart Card mode
+  wnUInt32 smart_card_clock   : 1;      ///< Smart Card Clock generator available
+  wnUInt32 flow_control_rts   : 1;      ///< RTS Flow Control available
+  wnUInt32 flow_control_cts   : 1;      ///< CTS Flow Control available
+  wnUInt32 event_tx_complete  : 1;      ///< Transmit completed event: \ref wnUSART_EVENT_TX_COMPLETE
+  wnUInt32 event_rx_timeout   : 1;      ///< Signal receive character timeout event: \ref wnUSART_EVENT_RX_TIMEOUT
+  wnUInt32 rts                : 1;      ///< RTS Line: 0=not available, 1=available
+  wnUInt32 cts                : 1;      ///< CTS Line: 0=not available, 1=available
+  wnUInt32 dtr                : 1;      ///< DTR Line: 0=not available, 1=available
+  wnUInt32 dsr                : 1;      ///< DSR Line: 0=not available, 1=available
+  wnUInt32 dcd                : 1;      ///< DCD Line: 0=not available, 1=available
+  wnUInt32 ri                 : 1;      ///< RI Line: 0=not available, 1=available
+  wnUInt32 event_cts          : 1;      ///< Signal CTS change event: \ref wnUSART_EVENT_CTS
+  wnUInt32 event_dsr          : 1;      ///< Signal DSR change event: \ref wnUSART_EVENT_DSR
+  wnUInt32 event_dcd          : 1;      ///< Signal DCD change event: \ref wnUSART_EVENT_DCD
+  wnUInt32 event_ri           : 1;      ///< Signal RI change event: \ref wnUSART_EVENT_RI
+  wnUInt32 reserved           : 11;     ///< Reserved (must be zero)
+} wnUSART_CAPABILITIES;
+
+
+/**
+\brief Access structure of the USART Driver.
+*/
+typedef struct _wnDRIVER_USART {
+  wnDRIVER_VERSION     (*GetVersion)      (void);                              ///< Pointer to \ref wnUSART_GetVersion : Get driver version.
+  wnUSART_CAPABILITIES (*GetCapabilities) (void);                              ///< Pointer to \ref wnUSART_GetCapabilities : Get driver capabilities.
+  wnInt32                (*Initialize)      (wnUSART_SignalEvent_t cb_event,wnBool interrupt_flag);  ///< Pointer to \ref wnUSART_Initialize : Initialize USART Interface.
+  wnInt32                (*Uninitialize)    (void);                              ///< Pointer to \ref wnUSART_Uninitialize : De-initialize USART Interface.
+  wnInt32                (*PowerControl)    (wnPOWER_STATE state);             ///< Pointer to \ref wnUSART_PowerControl : Control USART Interface Power.
+  wnInt32                (*Send)            (const void *data, wnUInt32 num);    ///< Pointer to \ref wnUSART_Send : Start sending data to USART transmitter.
+  wnInt32                (*Receive)         (      void *data, wnUInt32 num);    ///< Pointer to \ref wnUSART_Receive : Start receiving data from USART receiver.
+  wnInt32                (*Transfer)        (const void *data_out,
+                                                   void *data_in,
+                                             wnUInt32    num);                   ///< Pointer to \ref wnUSART_Transfer : Start sending/receiving data to/from USART.
+  wnUInt32               (*GetTxCount)      (void);                              ///< Pointer to \ref wnUSART_GetTxCount : Get transmitted data count.
+  wnUInt32               (*GetRxCount)      (void);                              ///< Pointer to \ref wnUSART_GetRxCount : Get received data count.
+  wnInt32                (*Control)         (wnUInt32 control, wnUInt32 arg);    ///< Pointer to \ref wnUSART_Control : Control USART Interface.
+  wnUSART_STATUS       (*GetStatus)       (void);                              ///< Pointer to \ref wnUSART_GetStatus : Get USART status.
+  wnInt32                (*SetModemControl) (wnUSART_MODEM_CONTROL control);   ///< Pointer to \ref wnUSART_SetModemControl : Set USART Modem Control line state.
+  wnUSART_MODEM_STATUS (*GetModemStatus)  (void);                              ///< Pointer to \ref wnUSART_GetModemStatus : Get USART Modem Status lines state.
+  wnInt32                (*Receive_interupt)  (      void *data, wnUInt32 num); 
+  wnInt32                (*Send_interupt)            (const void *data, wnUInt32 num);
+} const wnDRIVER_USART;
+
+#ifdef  __cplusplus
+}
+#endif
+
+#endif /* DRIVER_USART_H_ */
